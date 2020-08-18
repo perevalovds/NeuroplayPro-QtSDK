@@ -6,7 +6,7 @@ NeuroplayDevice::NeuroplayDevice(const QJsonObject &json) :
     m_id(-1),
     m_isConnected(false),
     m_isStarted(false),
-    m_grabRawData(false), m_grabRhythms(false), m_grabMeditation(false), m_grabConcentration(false),
+    m_grabRawData(false), m_grabOriginalData(false), m_grabRhythms(false), m_grabMeditation(false), m_grabConcentration(false),
     m_meditation(0), m_concentration(0)
 {
     m_name = json["name"].toString();
@@ -42,11 +42,38 @@ void NeuroplayDevice::makeFavorite()
     request("getfavoritedevicename");
 }
 
-NeuroplayDevice::ChannelsData NeuroplayDevice::rawData()
+void NeuroplayDevice::grabRawData(bool enable)
 {
-    m_grabRawData = true;
-    enableGrabMode();
+    m_grabRawData = enable;
+    switchGrabMode();
+}
 
+void NeuroplayDevice::grabOriginalData(bool enable)
+{
+    m_grabOriginalData = enable;
+    switchGrabMode();
+}
+
+void NeuroplayDevice::grabRhythmsHistory(bool enable)
+{
+    m_grabRhythms = enable;
+    switchGrabMode();
+}
+
+void NeuroplayDevice::grabMeditationHistory(bool enable)
+{
+    m_grabMeditation = enable;
+    switchGrabMode();
+}
+
+void NeuroplayDevice::grabConcentrationHistory(bool enable)
+{
+    m_grabConcentration = enable;
+    switchGrabMode();
+}
+
+NeuroplayDevice::ChannelsData NeuroplayDevice::readRawData()
+{
     ChannelsData result;
     while (!m_rawDataBuffer.isEmpty())
     {
@@ -60,10 +87,23 @@ NeuroplayDevice::ChannelsData NeuroplayDevice::rawData()
     return result;
 }
 
-QVector<NeuroplayDevice::ChannelsRhythms> NeuroplayDevice::rhythmsHistory()
+NeuroplayDevice::ChannelsData NeuroplayDevice::readOriginalData()
 {
-    m_grabRhythms = true;
-    enableGrabMode();
+    ChannelsData result;
+    while (!m_originalDataBuffer.isEmpty())
+    {
+        QVector<double> entry = m_originalDataBuffer.dequeue();
+        int chnum = entry.size();
+        if (result.size() < chnum)
+            result.resize(chnum);
+        for (int i=0; i<chnum; i++)
+            result[i] << entry[i];
+    }
+    return result;
+}
+
+QVector<NeuroplayDevice::ChannelsRhythms> NeuroplayDevice::readRhythmsHistory()
+{
     QVector<ChannelsRhythms> result;
     while (!m_rhythmsBuffer.isEmpty())
     {
@@ -72,10 +112,8 @@ QVector<NeuroplayDevice::ChannelsRhythms> NeuroplayDevice::rhythmsHistory()
     return result;
 }
 
-QVector<NeuroplayDevice::TimedValue> NeuroplayDevice::meditationHistory()
+QVector<NeuroplayDevice::TimedValue> NeuroplayDevice::readMeditationHistory()
 {
-    m_grabMeditation = true;
-    enableGrabMode();
     QVector<TimedValue> result;
     while (!m_meditationBuffer.isEmpty())
     {
@@ -84,10 +122,8 @@ QVector<NeuroplayDevice::TimedValue> NeuroplayDevice::meditationHistory()
     return result;
 }
 
-QVector<NeuroplayDevice::TimedValue> NeuroplayDevice::concentrationHistory()
+QVector<NeuroplayDevice::TimedValue> NeuroplayDevice::readConcentrationHistory()
 {
-    m_grabConcentration = true;
-    enableGrabMode();
     QVector<TimedValue> result;
     while (!m_concentrationBuffer.isEmpty())
     {
@@ -117,7 +153,12 @@ void NeuroplayDevice::start(int channelNumber)
 void NeuroplayDevice::stop()
 {
     m_isStarted = false;
-    disableGrabMode();
+    m_grabRawData = false;
+    m_grabOriginalData = false;
+    m_grabRhythms = false;
+    m_grabMeditation = false;
+    m_grabConcentration = false;
+    switchGrabMode();
     request("stopdevice");
 }
 
@@ -133,7 +174,6 @@ void NeuroplayDevice::setStarted(bool started)
 
 void NeuroplayDevice::request(QString text)
 {
-//    m_busy = true;
     emit doRequest(text);
 }
 
@@ -144,8 +184,9 @@ void NeuroplayDevice::request(QJsonObject json)
 
 void NeuroplayDevice::onResponse(QJsonObject resp)
 {
+    qDebug() << resp;
     QString cmd = resp["command"].toString();
-//    m_busy = false;
+
     if (cmd == "spectrum")
     {
         m_spectrum.clear();
@@ -154,7 +195,7 @@ void NeuroplayDevice::onResponse(QJsonObject resp)
         {
             QVector<double> array;
             for (QJsonValueRef val: ch.toArray())
-                array << val.toString().toDouble();
+                array << val.toDouble();
             m_spectrum << array;
         }
         emit spectrumReady();
@@ -163,7 +204,7 @@ void NeuroplayDevice::onResponse(QJsonObject resp)
     {
         m_spectrumFrequencies.clear();
         for (QJsonValueRef val: resp["spectrum"].toArray())
-            m_spectrumFrequencies << val.toString().toDouble();
+            m_spectrumFrequencies << val.toDouble();
     }
     else if (cmd == "rhythms")
     {
@@ -209,6 +250,32 @@ void NeuroplayDevice::onResponse(QJsonObject resp)
     }
     else if (cmd == "rawdata")
     {
+        ChannelsData data;
+        QJsonArray arr = resp["rawdata"].toArray();
+        for (QJsonValueRef ch: arr)
+        {
+            QVector<double> array;
+            for (QJsonValueRef val: ch.toArray())
+                array << val.toDouble();
+            data << array;
+        }
+        emit rawDataReceived(data);
+    }
+    else if (cmd == "originaldata")
+    {
+        ChannelsData data;
+        QJsonArray arr = resp["rawdata"].toArray();
+        for (QJsonValueRef ch: arr)
+        {
+            QVector<double> array;
+            for (QJsonValueRef val: ch.toArray())
+                array << val.toDouble();
+            data << array;
+        }
+        emit originalDataReceived(data);
+    }
+    else if (cmd == "grabrawdata")
+    {
         QJsonArray arr = resp["rawData"].toArray();
         int chnum = arr.size();
         int count = arr[0].toArray().size();
@@ -217,9 +284,24 @@ void NeuroplayDevice::onResponse(QJsonObject resp)
             QVector<double> entry;
             for (int j=0; j<chnum; j++)
             {
-                entry << arr[j].toArray()[i].toString().toDouble();
+                entry << arr[j].toArray()[i].toDouble();
             }
             m_rawDataBuffer.enqueue(entry);
+        }
+    }
+    else if (cmd == "graboriginaldata")
+    {
+        QJsonArray arr = resp["rawData"].toArray();
+        int chnum = arr.size();
+        int count = arr[0].toArray().size();
+        for (int i=0; i<count; i++)
+        {
+            QVector<double> entry;
+            for (int j=0; j<chnum; j++)
+            {
+                entry << arr[j].toArray()[i].toDouble();
+            }
+            m_originalDataBuffer.enqueue(entry);
         }
     }
     else if (cmd == "rhythmshistory")
@@ -273,26 +355,27 @@ void NeuroplayDevice::onResponse(QJsonObject resp)
     }
 }
 
-void NeuroplayDevice::enableGrabMode()
+void NeuroplayDevice::switchGrabMode()
 {
-    if (!m_grabTimer->isActive())
-        request("enabledatagrabmode");
-}
+    bool enable = false;
+    if (m_grabRawData || m_grabOriginalData || m_grabRhythms || m_grabMeditation || m_grabConcentration)
+        enable = true;
 
-void NeuroplayDevice::disableGrabMode()
-{
-    request("disabledatagrabmode");
-    m_grabTimer->stop();
-    m_grabRawData = false;
-    m_grabRhythms = false;
-    m_grabMeditation = false;
-    m_grabConcentration = false;
+    if (enable && !m_grabTimer->isActive())
+        request("enabledatagrabmode");
+    else if (!enable)
+    {
+        request("disabledatagrabmode");
+        m_grabTimer->stop();
+    }
 }
 
 void NeuroplayDevice::grabRequest()
 {
     if (m_grabRawData)
-        request("rawdata");
+        request("grabrawdata");
+    if (m_grabOriginalData)
+        request("graboriginaldata");
     if (m_grabRhythms)
         request("rhythmsHistory");
     if (m_grabMeditation)
@@ -301,25 +384,24 @@ void NeuroplayDevice::grabRequest()
         request("concentrationHistory");
 }
 
-
-
-
 // ====================== NeuroplayPro ========================= //
 
 NeuroplayPro::NeuroplayPro(QObject *parent) : QObject(parent),
-    m_isConnected(false),
+    m_state(Disconnected),
     m_isDataGrab(false),
     m_currentDevice(nullptr),
-    m_LPF(0), m_HPF(0), m_BSF(0)
+    m_LPF(0), m_HPF(0), m_BSF(0),
+    m_dataStorageTime(0)
 {
     socket = new QWebSocket();
     connect(socket, &QWebSocket::connected, [=]()
     {
+        m_state = Connected;
         send("help");
     });
     connect(socket, &QWebSocket::disconnected, [=]()
     {
-        m_isConnected = false;
+        m_state = Disconnected;
         emit disconnected();
     });
     connect(socket, &QWebSocket::textMessageReceived, this, &NeuroplayPro::onSocketResponse);
@@ -360,14 +442,25 @@ void NeuroplayPro::close()
 
 void NeuroplayPro::send(QString cmd)
 {
-//    m_busy = true;
     socket->sendTextMessage(cmd);
-    emit response("> " + cmd);
+//    emit response("> " + cmd);
 }
 
 void NeuroplayPro::send(QJsonObject obj)
 {
     send(QJsonDocument(obj).toJson());
+}
+
+NeuroplayDevice *NeuroplayPro::createDevice(const QJsonObject &o)
+{
+    NeuroplayDevice *dev = new NeuroplayDevice(o);
+    QObject::connect(dev, SIGNAL(doRequest(QString)), this, SLOT(send(QString)), Qt::QueuedConnection);
+    QObject::connect(this, SIGNAL(responseJson(QJsonObject)), dev, SLOT(onResponse(QJsonObject)), Qt::QueuedConnection);
+    dev->m_id = m_deviceList.size();
+    m_deviceMap[dev->name()] = dev;
+    m_deviceList << dev;
+    emit deviceConnected(dev);
+    return dev;
 }
 
 void NeuroplayPro::onSocketResponse(const QString &text)
@@ -378,7 +471,7 @@ void NeuroplayPro::onSocketResponse(const QString &text)
 
     emit responseJson(resp);
 
-    if (resp.contains("error") && !m_devStartTimer->isActive())
+    if (resp.contains("error") && m_state == Ready)
     {
         emit error(resp["error"].toString());
         return;
@@ -400,20 +493,24 @@ void NeuroplayPro::onSocketResponse(const QString &text)
                 help += c + " \t - " + m_commands[c] + "\n";
         }
 
+        // aqcuire current settings:
         send("getfavoritedevicename");
         send("getfilters");
+        send("getdatastoragetime");
 
-        send("startsearch");
+        // aqcuire current connected device.
+        // the search will started later if device is not connected
+        send("currentdeviceinfo");
 
-        bool need_emit = !m_isConnected;
-        m_isConnected = true;
+        bool need_emit = (m_state < Searching);
+        m_state = Searching;
         if (need_emit)
         {
             emit connected();
             return;
         }
 
-        emit response(help);
+//        emit response(help);
         return;
     }
     else if (cmd == "getfavoritedevicename")
@@ -426,12 +523,20 @@ void NeuroplayPro::onSocketResponse(const QString &text)
         m_HPF = resp["HPF"].toDouble(0);
         m_BSF = resp["BSF"].toDouble(0);
     }
+    else if (cmd == "getdatastoragetime")
+    {
+        m_dataStorageTime = resp["storagetime"].toInt();
+    }
     else if (cmd == "startsearch")
     {
         for (NeuroplayDevice *dev: m_deviceList)
             dev->m_isConnected = false;
         m_searchTimer->start();
-        QTimer::singleShot(3000, [=](){m_searchTimer->stop();});
+        QTimer::singleShot(3000, [=]()
+        {
+            m_searchTimer->stop();
+            m_state = Ready;
+        });
     }
     else if (cmd == "listdevices")
     {
@@ -443,13 +548,7 @@ void NeuroplayPro::onSocketResponse(const QString &text)
             NeuroplayDevice *dev = nullptr;
             if (!m_deviceMap.contains(name))
             {
-                dev = new NeuroplayDevice(o);
-                QObject::connect(dev, SIGNAL(doRequest(QString)), this, SLOT(send(QString)), Qt::QueuedConnection);
-                QObject::connect(this, SIGNAL(responseJson(QJsonObject)), dev, SLOT(onResponse(QJsonObject)), Qt::QueuedConnection);
-                dev->m_id = m_deviceList.size();
-                m_deviceMap[name] = dev;
-                m_deviceList << dev;
-                emit deviceConnected(dev);
+                dev = createDevice(o);
             }
             else
             {
@@ -469,13 +568,19 @@ void NeuroplayPro::onSocketResponse(const QString &text)
         if (resp["result"].toBool())
         {
             m_devStartTimer->stop();
-            QString name = resp["device"].toObject()["name"].toString();
-            if (m_deviceMap.contains(name))
+            QJsonObject o = resp["device"].toObject();
+            QString name = o["name"].toString();
+            if (!m_deviceMap.contains(name))
             {
-                m_currentDevice = m_deviceMap[name];
-                m_currentDevice->setStarted();
-                emit deviceReady(m_currentDevice);
+                createDevice(o);
             }
+            m_currentDevice = m_deviceMap[name];
+            m_currentDevice->setStarted();
+            emit deviceReady(m_currentDevice);
+        }
+        else if (m_state < Ready)
+        {
+            send("startsearch");
         }
     }
     else if (cmd == "enabledatagrabmode")
@@ -487,9 +592,7 @@ void NeuroplayPro::onSocketResponse(const QString &text)
         m_isDataGrab = false;
     }
 
-//    m_busy = false;
-
-    emit response(text);
+//    emit response(text);
 }
 
 void NeuroplayPro::setLPF(double value)
@@ -520,6 +623,11 @@ void NeuroplayPro::setFilters(double LPF, double HPF, double BSF)
 void NeuroplayPro::setDefaultFilters()
 {
     send("setdefaultfilters");
+}
+
+void NeuroplayPro::setDataStorageTime(int seconds)
+{
+    send({{"command", "setdatastoragetime"}, {"value", seconds}});
 }
 
 void NeuroplayPro::enableDataGrabMode()

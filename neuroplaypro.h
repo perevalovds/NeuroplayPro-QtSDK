@@ -9,17 +9,6 @@
 #include <QTimer>
 #include <QVector>
 #include <QQueue>
-//#include <QThread>
-#include <QtConcurrent/QtConcurrentRun>
-
-/*
-    NeuroplayPro 1.2.2 API buglist #2
-    1. в makeFavorite можно подсунуть любую строку, и она запомнится. Как-то не очень)
-    2. (не баг) в описании RawData не хватает заметки, что этот запрос работает только в DataGrabMode
-    3. (тоже не баг) в описании запроса Rhythms ничего не написано про "t", а оно есть
-    4. rawData и spectrum приходит типа string, а не number. QJsonValue не умеет переводить тип автоматом, приходится value.toString().toDouble(), как-то некрасиво.
-    5. по-прежнему проблемы с коннектом. Если тыкнуть на девайс, идут графики, потом вернуться на предыдущую вкладку, нажать "Поиск устройств", то это устройство исчезает из списка и не возвращается, и графики после этого останавливаются.
- */
 
 class NeuroplayDevice : public QObject
 {
@@ -58,10 +47,17 @@ public:
     bool isConnected() const {return m_isConnected;}
     bool isStarted() const {return m_isStarted;}
 
-    ChannelsData rawData();
-    QVector<ChannelsRhythms> rhythmsHistory();
-    QVector<TimedValue> meditationHistory();
-    QVector<TimedValue> concentrationHistory();
+    void grabRawData(bool enable = true);
+    void grabOriginalData(bool enable = true);
+    void grabRhythmsHistory(bool enable = true);
+    void grabMeditationHistory(bool enable = true);
+    void grabConcentrationHistory(bool enable = true);
+
+    ChannelsData readRawData();
+    ChannelsData readOriginalData();
+    QVector<ChannelsRhythms> readRhythmsHistory();
+    QVector<TimedValue> readMeditationHistory();
+    QVector<TimedValue> readConcentrationHistory();
 
     void setGrabInterval(int value_ms);
     int grabInterval() const {return m_grabIntervalMs;}
@@ -72,25 +68,23 @@ public slots:
     void stop();
 
     void requestRawData()       {request("rawdata");}
+    void requestOriginalData()  {request("originaldata");}
     void requestSpectrum()      {request("spectrum");}
-    void requestRhytms()        {request("rhythms");}
+    void requestRhythms()       {request("rhythms");}
     void requestMeditation()    {request("meditation");}
     void requestConcentration() {request("concentration");}
     void requestBCI()           {request("BCI");}
 
-    void enableGrabMode();
-    void disableGrabMode();
-
 signals:
     void ready();
 
+    void rawDataReceived(ChannelsData data);
+    void originalDataReceived(ChannelsData data);
     void spectrumReady();
     void rhythmsReady();
     void meditationReady();
     void concentrationReady();
     void bciReady();
-
-    void rawDataReady();
 
 private:
     int m_id;
@@ -105,9 +99,9 @@ private:
 
     bool m_isConnected;
     bool m_isStarted;
-//    bool m_busy = false;
 
     bool m_grabRawData;
+    bool m_grabOriginalData;
     bool m_grabRhythms;
     bool m_grabMeditation;
     bool m_grabConcentration;
@@ -119,6 +113,7 @@ private:
     double m_concentration;
 
     QQueue< QVector<double> > m_rawDataBuffer;
+    QQueue< QVector<double> > m_originalDataBuffer;
     QQueue<ChannelsRhythms> m_rhythmsBuffer;
     QQueue<TimedValue> m_meditationBuffer;
     QQueue<TimedValue> m_concentrationBuffer;
@@ -130,6 +125,8 @@ private:
     void request(QString text);
     void request(QJsonObject json);
 
+    void switchGrabMode();
+
 signals: // private
     void doRequest(QString text);
 
@@ -138,15 +135,20 @@ private slots:
     void grabRequest();
 };
 
+
+
 // ============================================================== //
 
 class NeuroplayPro : public QObject
 {
     Q_OBJECT
 public:
+    enum State {Disconnected, Connected, Searching, Ready};
+
     explicit NeuroplayPro(QObject *parent = nullptr);
     virtual ~NeuroplayPro();
-    bool isConnected() const {return m_isConnected;}
+    State state() const {return m_state;}
+    bool isConnected() const {return m_state >= Connected;}
     bool isDataGrabMode() const {return m_isDataGrab;}
     int deviceCount() const {return m_deviceList.size();}
     NeuroplayDevice *device(int id) {return (id >= 0 && id < deviceCount())? m_deviceList[id]: nullptr;}
@@ -163,6 +165,9 @@ public:
     void setFilters(double LPF, double HPF, double BSF);
     void setDefaultFilters();
 
+    int dataStorageTime() const {return m_dataStorageTime;}
+    void setDataStorageTime(int seconds);
+
 public slots:
     void open();
     void close();
@@ -173,7 +178,6 @@ public slots:
 signals:
     void connected();
     void disconnected();
-    void response(QString text);
     void error(QString text);
     void deviceConnected(NeuroplayDevice *device);
     void deviceReady(NeuroplayDevice *device);
@@ -184,7 +188,7 @@ public slots:
 
 private:
     QWebSocket *socket;
-    bool m_isConnected;
+    State m_state;
     bool m_isDataGrab;
     QMap<QString, QString> m_commands;
     QVector<NeuroplayDevice*> m_deviceList;
@@ -194,11 +198,12 @@ private:
     NeuroplayDevice *m_currentDevice;
     QString m_favoriteDeviceName;
     double m_LPF, m_HPF, m_BSF;
+    int m_dataStorageTime;
 
     void send(QJsonObject obj);
     friend class NeuroplayDevice;
 
-//    bool m_busy;
+    NeuroplayDevice *createDevice(const QJsonObject &o);
 
 private slots:
     void onSocketResponse(const QString &text);

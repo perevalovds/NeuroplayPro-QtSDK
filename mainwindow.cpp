@@ -41,10 +41,12 @@ MainWindow::MainWindow(QWidget *parent) :
 
     QPushButton *btnSpectrum = new QPushButton("Spectrum");
     QPushButton *btnRawData = new QPushButton("RawData");
+    QPushButton *btnMeditation = new QPushButton("Meditation");
 
     QVBoxLayout *layButtons = new QVBoxLayout;
     layButtons->addWidget(btnSpectrum);
     layButtons->addWidget(btnRawData);
+    layButtons->addWidget(btnMeditation);
 
     QGridLayout *layout = new QGridLayout;
     ui->centralWidget->setLayout(layout);
@@ -54,10 +56,10 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(neuroplay, &NeuroplayPro::connected, [=](){status->setText("connected");});
     connect(neuroplay, &NeuroplayPro::disconnected, [=](){status->setText("disconnected");});
-    connect(neuroplay, &NeuroplayPro::response, [=](QString text){log->append(text);});
     connect(neuroplay, &NeuroplayPro::error, [=](QString text)
     {
-        QMessageBox::warning(this, "NeuroplayPro error", text);
+        log->append("ERROR: " + text);
+//        QMessageBox::warning(this, "NeuroplayPro error", text);
     });
     connect(neuroplay, &NeuroplayPro::deviceConnected, [=](NeuroplayDevice *device)
     {
@@ -89,12 +91,21 @@ MainWindow::MainWindow(QWidget *parent) :
                 device->requestSpectrum();
                 NeuroplayDevice::ChannelsData spectrum = device->spectrum();
                 qDebug() << "spectrum: " << spectrum.size() << "x" << (spectrum.size()? spectrum[0].size(): 0);
+                qDebug() << spectrum;
             });
 
             connect(btnRawData, &QPushButton::clicked, [=]()
             {
-                qDebug() << device->rawData();
-//                device->rawData();
+                device->requestRawData();
+                connect(device, &NeuroplayDevice::rawDataReceived, [=](NeuroplayDevice::ChannelsData data)
+                {
+                    qDebug() << "Raw data:" << data.size() << "x" << (data.size()? data[0].size(): 0);
+                });
+            });
+
+            connect(btnMeditation, &QPushButton::clicked, [=]()
+            {
+                qDebug() << device->meditation();
             });
         });
     });
