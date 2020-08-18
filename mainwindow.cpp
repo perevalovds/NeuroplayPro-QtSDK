@@ -10,6 +10,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     status = new QLabel;
 
+    chart = new ChartTest;
+
     btnOpen = new QPushButton("Connect");
     connect(btnOpen, &QPushButton::clicked, [=]()
     {
@@ -30,8 +32,10 @@ MainWindow::MainWindow(QWidget *parent) :
     tree->setColumnCount(2);
     tree->setColumnWidth(0, 200);
     tree->setHeaderHidden(true);
+    tree->setMaximumWidth(300);
 
     log = new QTextEdit;
+    log->setMaximumHeight(100);
 
     ui->mainToolBar->addWidget(btnOpen);
     ui->mainToolBar->addWidget(editCmd);
@@ -52,9 +56,14 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->centralWidget->setLayout(layout);
     layout->addWidget(tree, 0, 0);
     layout->addLayout(layButtons, 0, 1);
-    layout->addWidget(log, 1, 0, 1, 2);
+    layout->addWidget(chart, 0, 2);
+    layout->addWidget(log, 1, 0, 1, 3);
 
-    connect(neuroplay, &NeuroplayPro::connected, [=](){status->setText("connected");});
+    connect(neuroplay, &NeuroplayPro::connected, [=]()
+    {
+        status->setText("connected");
+        neuroplay->setDataStorageTime(5);
+    });
     connect(neuroplay, &NeuroplayPro::disconnected, [=](){status->setText("disconnected");});
     connect(neuroplay, &NeuroplayPro::error, [=](QString text)
     {
@@ -88,23 +97,31 @@ MainWindow::MainWindow(QWidget *parent) :
 
             connect(btnSpectrum, &QPushButton::clicked, [=]()
             {
+                chart->setLimit(100);
                 device->requestSpectrum();
                 NeuroplayDevice::ChannelsData spectrum = device->spectrum();
-                qDebug() << "spectrum: " << spectrum.size() << "x" << (spectrum.size()? spectrum[0].size(): 0);
-                qDebug() << spectrum;
+                chart->setData(spectrum);
+//                qDebug() << "spectrum: " << spectrum.size() << "x" << (spectrum.size()? spectrum[0].size(): 0);
+//                qDebug() << spectrum;
             });
 
             connect(btnRawData, &QPushButton::clicked, [=]()
             {
-                device->requestRawData();
-                connect(device, &NeuroplayDevice::rawDataReceived, [=](NeuroplayDevice::ChannelsData data)
-                {
-                    qDebug() << "Raw data:" << data.size() << "x" << (data.size()? data[0].size(): 0);
-                });
+                chart->setLimit(1000000);
+//                device->requestRawData();
+                device->requestOriginalData();
             });
+
+            connect(device, &NeuroplayDevice::originalDataReceived, [=](NeuroplayDevice::ChannelsData data)
+            {
+                qDebug() << "Original data:" << data.size() << "x" << (data.size()? data[0].size(): 0);
+            });
+
+            connect(device, &NeuroplayDevice::originalDataReceived, chart, &ChartTest::setData);
 
             connect(btnMeditation, &QPushButton::clicked, [=]()
             {
+                device->requestMeditation();
                 qDebug() << device->meditation();
             });
         });

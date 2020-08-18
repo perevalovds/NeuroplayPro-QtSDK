@@ -72,7 +72,7 @@ void NeuroplayDevice::grabConcentrationHistory(bool enable)
     switchGrabMode();
 }
 
-NeuroplayDevice::ChannelsData NeuroplayDevice::readRawData()
+NeuroplayDevice::ChannelsData NeuroplayDevice::readRawDataHistory()
 {
     ChannelsData result;
     while (!m_rawDataBuffer.isEmpty())
@@ -87,7 +87,7 @@ NeuroplayDevice::ChannelsData NeuroplayDevice::readRawData()
     return result;
 }
 
-NeuroplayDevice::ChannelsData NeuroplayDevice::readOriginalData()
+NeuroplayDevice::ChannelsData NeuroplayDevice::readOriginalDataHistory()
 {
     ChannelsData result;
     while (!m_originalDataBuffer.isEmpty())
@@ -184,7 +184,7 @@ void NeuroplayDevice::request(QJsonObject json)
 
 void NeuroplayDevice::onResponse(QJsonObject resp)
 {
-    qDebug() << resp;
+//    qDebug() << resp;
     QString cmd = resp["command"].toString();
 
     if (cmd == "spectrum")
@@ -251,7 +251,7 @@ void NeuroplayDevice::onResponse(QJsonObject resp)
     else if (cmd == "rawdata")
     {
         ChannelsData data;
-        QJsonArray arr = resp["rawdata"].toArray();
+        QJsonArray arr = resp["rawData"].toArray();
         for (QJsonValueRef ch: arr)
         {
             QVector<double> array;
@@ -264,7 +264,7 @@ void NeuroplayDevice::onResponse(QJsonObject resp)
     else if (cmd == "originaldata")
     {
         ChannelsData data;
-        QJsonArray arr = resp["rawdata"].toArray();
+        QJsonArray arr = resp["rawData"].toArray();
         for (QJsonValueRef ch: arr)
         {
             QVector<double> array;
@@ -442,6 +442,7 @@ void NeuroplayPro::close()
 
 void NeuroplayPro::send(QString cmd)
 {
+    qDebug() << "> " + cmd;
     socket->sendTextMessage(cmd);
 //    emit response("> " + cmd);
 }
@@ -454,8 +455,9 @@ void NeuroplayPro::send(QJsonObject obj)
 NeuroplayDevice *NeuroplayPro::createDevice(const QJsonObject &o)
 {
     NeuroplayDevice *dev = new NeuroplayDevice(o);
-    QObject::connect(dev, SIGNAL(doRequest(QString)), this, SLOT(send(QString)), Qt::QueuedConnection);
-    QObject::connect(this, SIGNAL(responseJson(QJsonObject)), dev, SLOT(onResponse(QJsonObject)), Qt::QueuedConnection);
+    qDebug() << "device created" << dev->name();
+    QObject::connect(dev, SIGNAL(doRequest(QString)), this, SLOT(send(QString)));//, Qt::QueuedConnection);
+    QObject::connect(this, SIGNAL(responseJson(QJsonObject)), dev, SLOT(onResponse(QJsonObject)));//, Qt::QueuedConnection);
     dev->m_id = m_deviceList.size();
     m_deviceMap[dev->name()] = dev;
     m_deviceList << dev;
@@ -627,7 +629,8 @@ void NeuroplayPro::setDefaultFilters()
 
 void NeuroplayPro::setDataStorageTime(int seconds)
 {
-    send({{"command", "setdatastoragetime"}, {"value", seconds}});
+    //! @bug "value" value expected as string instead of number!
+    send({{"command", "setdatastoragetime"}, {"value", QString::number(seconds)}});
 }
 
 void NeuroplayPro::enableDataGrabMode()

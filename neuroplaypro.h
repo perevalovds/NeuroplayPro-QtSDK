@@ -53,8 +53,8 @@ public:
     void grabMeditationHistory(bool enable = true);
     void grabConcentrationHistory(bool enable = true);
 
-    ChannelsData readRawData();
-    ChannelsData readOriginalData();
+    ChannelsData readRawDataHistory();
+    ChannelsData readOriginalDataHistory();
     QVector<ChannelsRhythms> readRhythmsHistory();
     QVector<TimedValue> readMeditationHistory();
     QVector<TimedValue> readConcentrationHistory();
