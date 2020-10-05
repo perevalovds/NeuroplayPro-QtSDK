@@ -47,14 +47,14 @@ public:
     bool isConnected() const {return m_isConnected;}
     bool isStarted() const {return m_isStarted;}
 
+    void grabFilteredData(bool enable = true);
     void grabRawData(bool enable = true);
-    void grabOriginalData(bool enable = true);
     void grabRhythmsHistory(bool enable = true);
     void grabMeditationHistory(bool enable = true);
     void grabConcentrationHistory(bool enable = true);
 
+    ChannelsData readFilteredDataHistory();
     ChannelsData readRawDataHistory();
-    ChannelsData readOriginalDataHistory();
     QVector<ChannelsRhythms> readRhythmsHistory();
     QVector<TimedValue> readMeditationHistory();
     QVector<TimedValue> readConcentrationHistory();
@@ -67,8 +67,11 @@ public slots:
     void start(int channelNumber);
     void stop();
 
+    void startRecord() {request("startrecord");}
+    void stopRecord() {request("stoprecord");}
+
+    void requestFilteredData()  {request("filtereddata");}
     void requestRawData()       {request("rawdata");}
-    void requestOriginalData()  {request("originaldata");}
     void requestSpectrum()      {request("spectrum");}
     void requestRhythms()       {request("rhythms");}
     void requestMeditation()    {request("meditation");}
@@ -78,13 +81,15 @@ public slots:
 signals:
     void ready();
 
+    void filteredDataReceived(ChannelsData data);
     void rawDataReceived(ChannelsData data);
-    void originalDataReceived(ChannelsData data);
     void spectrumReady();
     void rhythmsReady();
     void meditationReady();
     void concentrationReady();
     void bciReady();
+
+    void recordedData(QByteArray edf, QByteArray npd);
 
 private:
     int m_id;
@@ -100,8 +105,8 @@ private:
     bool m_isConnected;
     bool m_isStarted;
 
+    bool m_grabFilteredData;
     bool m_grabRawData;
-    bool m_grabOriginalData;
     bool m_grabRhythms;
     bool m_grabMeditation;
     bool m_grabConcentration;
@@ -112,8 +117,8 @@ private:
     double m_meditation;
     double m_concentration;
 
+    QQueue< QVector<double> > m_filteredDataBuffer;
     QQueue< QVector<double> > m_rawDataBuffer;
-    QQueue< QVector<double> > m_originalDataBuffer;
     QQueue<ChannelsRhythms> m_rhythmsBuffer;
     QQueue<TimedValue> m_meditationBuffer;
     QQueue<TimedValue> m_concentrationBuffer;
@@ -155,6 +160,7 @@ public:
     NeuroplayDevice *device(QString sn) {return m_deviceMap.contains(sn)? m_deviceMap[sn]: nullptr;}
     NeuroplayDevice *currentDevice() {return m_currentDevice;}
     QString favoriteDeviceName() const {return m_favoriteDeviceName;}
+    QString version() {return m_version;}
 
     double LPF() const {return m_LPF;}
     void setLPF(double value);
@@ -199,6 +205,7 @@ private:
     QString m_favoriteDeviceName;
     double m_LPF, m_HPF, m_BSF;
     int m_dataStorageTime;
+    QString m_version;
 
     void send(QJsonObject obj);
     friend class NeuroplayDevice;

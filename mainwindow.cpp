@@ -108,16 +108,16 @@ MainWindow::MainWindow(QWidget *parent) :
             connect(btnRawData, &QPushButton::clicked, [=]()
             {
                 chart->setLimit(1000000);
-//                device->requestRawData();
-                device->requestOriginalData();
+//                device->requestFilteredData();
+                device->requestRawData();
             });
 
-            connect(device, &NeuroplayDevice::originalDataReceived, [=](NeuroplayDevice::ChannelsData data)
+            connect(device, &NeuroplayDevice::rawDataReceived, [=](NeuroplayDevice::ChannelsData data)
             {
                 qDebug() << "Original data:" << data.size() << "x" << (data.size()? data[0].size(): 0);
             });
 
-            connect(device, &NeuroplayDevice::originalDataReceived, chart, &ChartTest::setData);
+            connect(device, &NeuroplayDevice::rawDataReceived, chart, &ChartTest::setData);
 
             connect(btnMeditation, &QPushButton::clicked, [=]()
             {
