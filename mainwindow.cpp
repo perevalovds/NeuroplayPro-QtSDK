@@ -44,7 +44,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->statusBar->addWidget(status);
 
     QPushButton *btnSpectrum = new QPushButton("Spectrum");
-    QPushButton *btnRawData = new QPushButton("RawData");
+    QPushButton *btnRawData = new QPushButton("FilteredData");
     QPushButton *btnMeditation = new QPushButton("Meditation");
 
     QVBoxLayout *layButtons = new QVBoxLayout;
@@ -107,10 +107,21 @@ MainWindow::MainWindow(QWidget *parent) :
 
             connect(btnRawData, &QPushButton::clicked, [=]()
             {
-                chart->setLimit(1000000);
-//                device->requestFilteredData();
-                device->requestRawData();
+                chart->setLimit(200); //1000000);
+                device->requestFilteredData();
+                //device->requestRawData();
             });
+
+            //---------------------
+
+            connect(device, &NeuroplayDevice::filteredDataReceived, [=](NeuroplayDevice::ChannelsData data)
+            {
+                qDebug() << "Filtered data:" << data.size() << "x" << (data.size()? data[0].size(): 0);
+            });
+
+            connect(device, &NeuroplayDevice::filteredDataReceived, chart, &ChartTest::setData);
+
+            //---------------------
 
             connect(device, &NeuroplayDevice::rawDataReceived, [=](NeuroplayDevice::ChannelsData data)
             {
