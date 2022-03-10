@@ -184,10 +184,10 @@ void NeuroplayDevice::request(QJsonObject json)
 
 void NeuroplayDevice::onResponse(QJsonObject resp)
 {
-//    qDebug() << resp;
     QString cmd = resp["command"].toString();
+    qDebug() << "received " << cmd;
 
-    if (cmd == "spectrum")
+    if (cmd == "lastspectrum")
     {
         m_spectrum.clear();
         QJsonArray arr = resp["spectrum"].toArray();

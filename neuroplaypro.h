@@ -72,7 +72,15 @@ public slots:
 
     void requestFilteredData()  {request("filtereddata");}
     void requestRawData()       {request("rawdata");}
-    void requestSpectrum()      {request("spectrum");}
+    void requestSpectrum()      {
+        if (!grab_mode_enabled)
+        {
+            request("enableDataGrabMode");
+            grab_mode_enabled = true;
+        }
+        request("lastSpectrum");
+    }
+
     void requestRhythms()       {request("rhythms");}
     void requestMeditation()    {request("meditation");}
     void requestConcentration() {request("concentration");}
@@ -110,6 +118,8 @@ private:
     bool m_grabRhythms;
     bool m_grabMeditation;
     bool m_grabConcentration;
+
+    bool grab_mode_enabled = false;
 
     QVector<double> m_spectrumFrequencies;
     ChannelsData m_spectrum;

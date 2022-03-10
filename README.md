@@ -21,6 +21,8 @@ Also you may send other commands to NeuroplayPro by typing them in the edit line
 
 # API docs
 
+- See `NeuroplayDevice::onResponse()` for variants of commands, but not all can be supported in the current SDK.
+
 - Locally, when NeuroplayPro is running: http://127.0.0.1:2336/api
 
 - Web page: https://neuroplay.ru/api-sdk/NeuroplayPro-API.html?r=0.35787390205751457
