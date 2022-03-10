@@ -10,8 +10,8 @@ class Chart: public QWidget
     Q_OBJECT
 public:
     Chart(QWidget *parent = nullptr);
-    void setData(const NeuroplayDevice::ChannelsData &data);
-    void setLimit(double limit);
+    void setData(const NeuroplayDevice::ChannelsData &data, double limit);
+    void clear();
 protected:
     void paintEvent(QPaintEvent *) override;
 private:

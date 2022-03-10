@@ -111,8 +111,7 @@ MainWindow::MainWindow(QWidget *parent) :
             {
                 //Spectrum is updated each 0.1 seconds
                 NeuroplayDevice::ChannelsData spectrum = device->spectrum();
-                chart->setLimit(-30);
-                chart->setData(spectrum);
+                chart->setData(spectrum, -20);
                 qDebug() << "Spectrum: " << spectrum.size() << "x" << (spectrum.size()? spectrum[0].size(): 0);
                 //qDebug() << spectrum;
             });
@@ -120,23 +119,23 @@ MainWindow::MainWindow(QWidget *parent) :
             connect(device, &NeuroplayDevice::filteredDataReceived, [=](NeuroplayDevice::ChannelsData data)
             {
                 qDebug() << "Filtered data:" << data.size() << "x" << (data.size()? data[0].size(): 0);
-                chart->setLimit(200);
-                chart->setData(data);
+                chart->setData(data, 200);
             });
 
 
             connect(device, &NeuroplayDevice::rawDataReceived, [=](NeuroplayDevice::ChannelsData data)
             {
                 qDebug() << "Raw data:" << data.size() << "x" << (data.size()? data[0].size(): 0);
-                chart->setLimit(100000);
-                chart->setData(data);
+                chart->setData(data, 100000);
             });
 
 
             connect(btnMeditation, &QPushButton::clicked, [=]()
             {
                 device->requestMeditation();
-                qDebug() << device->meditation();
+                chart->clear();
+                log->append(QString("meditaion %1").arg(device->meditation()));
+                //qDebug() << device->meditation();
             });
         });
     });
@@ -162,6 +161,14 @@ MainWindow::MainWindow(QWidget *parent) :
             }
         }
     });
+
+    log->append("Start NeuroPlayPro app, press Connect button, and then press Graphs, Spectrum, Meditation buttons");
+    log->append("To send specific command, type it in the text field and press Send button");
+
+
+
+
+
 }
 
 MainWindow::~MainWindow()
