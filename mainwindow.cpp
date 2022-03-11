@@ -164,10 +164,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     log->append("Start NeuroPlayPro app, press Connect button, and then press Graphs, Spectrum, Meditation buttons");
     log->append("To send specific command, type it in the text field and press Send button");
-
-
-
-
+    log->append("Detailed API (with NeuroPlayPro) is accessible at http://127.0.0.1:2336/api");
 
 }
 
