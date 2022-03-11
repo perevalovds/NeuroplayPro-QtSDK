@@ -2,7 +2,8 @@
 
 This is C++ code for working with BCI devices Neuroplay-6C and Neuroplay-8Cap, https://neuroplay.ru
 
-![NeuroplayPro-QtSDK](https://raw.githubusercontent.com/EndlessBits/EndlessSynth/main/drums/how_to_assembly/05_drum_pedal_2tones_timbres.jpg)
+![NeuroplayPro-QtSDK](https://raw.githubusercontent.com/perevalovds/NeuroplayPro-QtSDK/raw/master/doc/NPP_Qt_Graphs.png)
+
 
 # Requirements
 
